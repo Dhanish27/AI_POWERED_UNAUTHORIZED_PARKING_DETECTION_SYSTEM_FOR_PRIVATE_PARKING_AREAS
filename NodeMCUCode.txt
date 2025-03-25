@@ -1,0 +1,64 @@
+#include <SoftwareSerial.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include <SoftwareSerial.h>
+
+#define NODE_TX D1  // Define TX pin for NodeMCU
+#define NODE_RX D2  // Define RX pin for NodeMCU
+
+SoftwareSerial mySerial(NODE_RX, NODE_TX);
+
+
+
+constexpr uint8_t RST_PIN = D3;     // Configurable, see typical pin layout above
+constexpr uint8_t SS_PIN = D4;     // Configurable, see typical pin layout above
+
+MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
+MFRC522::MIFARE_Key key;
+
+String tag;
+const String AUTHORIZED_TAG = "F3FB962F";
+ // Define the GPIO pin for the light (e.g., D1)
+
+void setup() {
+  
+  Serial.begin(9600);
+  mySerial.begin(9600);
+  SPI.begin(); // Init SPI bus
+  rfid.PCD_Init();
+}
+
+void loop() {
+  if (Serial.available() > 0) { // Check if data is received
+    char signal = Serial.read();
+    if (signal == '1') {
+    
+      tag = ""; // Clear the tag string
+      if (rfid.PICC_IsNewCardPresent()){
+        if (rfid.PICC_ReadCardSerial()) {
+          
+
+          // Loop through the UID bytes and append them to the tag string
+          for (byte i = 0; i < rfid.uid.size; i++) {
+            tag += String(rfid.uid.uidByte[i], HEX); // Append each byte in HEX
+          }
+
+          tag.toUpperCase(); // Convert tag to uppercase for consistency
+        }
+      }
+        // Check if the tag matches the authorized tag
+        if (tag == AUTHORIZED_TAG) {
+          Serial.println("Access Granted");
+        } else {
+          Serial.println("Access Denied");
+          mySerial.println("ON");  // Send the signal
+          // delay(5000);
+        }
+
+        tag = ""; // Clear tag after use
+        rfid.PICC_HaltA();
+        rfid.PCD_StopCrypto1();
+      
+    }
+  }              
+}
